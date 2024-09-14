@@ -1,0 +1,320 @@
+Option Explicit
+'Option Private Module
+
+Function VNiTelex(ByVal text As String, Optional oregex___ As Object, Optional odi___ As Object, Optional ByVal floor___%) As String
+  'VNiTelex v1.2 : 03/02/2024
+  Dim l&: l = Len(text): If l = 0 Then Exit Function
+  Dim di2, m, ms, m0$, m1, m2$, m3$, aF, iba%, re, re2 As Object, v$, z$, ms2, m_, i1&, i2&, i3&
+  Set re = CreateObject("VBScript.RegExp")
+  With re:
+    .Global = -1: .IgnoreCase = 0: .MultiLine = -1
+    .pattern = "\u0110": text = .Replace(text, "Dd")
+    .pattern = "\u0111": text = .Replace(text, "dd")
+    .IgnoreCase = -1:
+    ' Nêìu chuôÞi nãÌm trong cãòp {/ ... /} thiÌ không biò thay thêì
+    .pattern = "(^|[^\\]?)\{/([^\u0008]*?)/\}"
+  End With
+ 
+  If odi___ Is Nothing Then
+    Set odi___ = CreateObject("Scripting.Dictionary"): odi___.CompareMode = 0
+    ' Các Phuò âm ghép
+    '"(?:ngh|qu|tr|ch|th|nh|ng|ph|gi|kh|gh|r|t|s|d|h|l|x|c|v|b|n|m|[\u0111])"
+    'AI, AO, AU, ÂU, AY, ÂY, EO, ÊU, IA, IÊU, YÊU, IU, OI, ÔI, ÕI, OAI, OAO, OAY, OEO, ÝA, UI, ÝI, ÝU, UÕ, UAI, UÂY, UÔI, ÝÕI, ÝÕU, UYA, UYU
+    Dim ba1, ba2, angg, pat1, pat2
+    pat1 = Array("a", "a", "a", "e", "e", "i", "o", "o", "o", "u", "u", "y")
+    pat2 = Array("", "w", "a", "", "e", "", "", "o", "w", "", "w", "")
+    ba1 = Array(Array(0, 259, 226, 0, 234, 0, 0, 244, 417, 0, 432, 0), _
+                Array(225, 7855, 7845, 233, 7871, 237, 243, 7889, 7899, 250, 7913, 253), _
+                Array(224, 7857, 7847, 232, 7873, 236, 242, 7891, 7901, 249, 7915, 7923), _
+                Array(7843, 7859, 7849, 7867, 7875, 7881, 7887, 7893, 7903, 7911, 7917, 7927), _
+                Array(227, 7861, 7851, 7869, 7877, 297, 245, 7895, 7905, 361, 7919, 7929), _
+                Array(7841, 7863, 7853, 7865, 7879, 7883, 7885, 7897, 7907, 7909, 7921, 7925))
+    ba2 = Array("", "s", "f", "r", "x", "j")
+    For iba = 0 To 5:
+      angg = ba1(iba)
+      For m = 0 To 11:
+        If angg(m) > 0 Then
+          m0 = ChrW$(angg(m))
+          odi___.add m0, Array(pat1(m), pat2(m), ba2(iba))
+          odi___.add UCase$(m0), Array(UCase$(pat1(m)), pat2(m), ba2(iba))
+        End If
+      Next
+    Next
+    odi___.add "scrt", CreateObject("Scripting.Dictionary"): Set di2 = odi___("scrt")
+  Else
+    Set di2 = odi___("scrt"): If floor___ = 0 And di2.count Then di2.RemoveAll
+  End If
+  If oregex___ Is Nothing Then
+    Set oregex___ = CreateObject("VBScript.RegExp")
+    With oregex___:  .Global = -1: .IgnoreCase = -1: .MultiLine = -1
+      Dim mpVowel$
+      mpVowel = "\u1EC7\u00C0-\u00C3\u00C8-\u00CA\u00CC\u00CD\u00D2-\u00D5\u00D9\u00DA\u00DD\u00E0-\u00E3\u00E8-\u00EA\u00EC\u00ED\u00F2-\u00F5\u00F9\u00FA\u00FD\u0102\u0103\u0128\u0129\u0168\u0169\u01A0\u01A1\u01AF\u01B0\u1EA0-\u1EF9" '\u0110\u0111
+      .pattern = "(([\u01B0]?[" & mpVowel & "])(ch|ng|nh|t|c|n|m|p|a|i|o|u|y|[\u01A0]|))"
+    End With
+    '
+  End If
+  Set ms2 = re.Execute(text)
+  re.IgnoreCase = 0:
+  If ms2.count Then
+    i1 = 1
+    For Each m_ In ms2
+      v = m_.SubMatches(0)
+      If v = Empty Then i2 = 1 Else i2 = 2
+      i3 = m_.firstIndex + i2
+      If i3 > i1 Then
+        v = Mid$(text, i1, i3 - i1)
+        GoSub r: z = z & VNiEscape(v, re2) & m_.SubMatches(1)
+      Else
+        z = z & m_.SubMatches(1)
+      End If
+      i1 = m_.firstIndex + m_.Length + 1
+    Next
+    If i1 <= l Then v = Mid$(text, i1): GoSub r: z = z & VNiEscape(v, re2)
+  Else
+    v = text: GoSub r: z = VNiEscape(v, re2)
+  End If
+  VNiTelex = z
+Exit Function
+r:
+  If di2.count Then di2.RemoveAll
+  Set ms = oregex___.Execute(v)
+  If ms.count = 0 Then Return
+  iba = 2:
+l:
+  For Each m1 In ms
+    If Not di2.Exists(m1) Then
+      m3 = m1.SubMatches(2)
+      If Len(m3) = iba Then
+        di2.add m1, "":  m2 = m1.SubMatches(1):
+        If Len(m2) = 2 Then
+          m0 = odi___(Left$(m2, 1))(0): aF = odi___(Right$(m2, 1))
+        Else
+          m0 = "": aF = odi___(m2)
+        End If
+        re.pattern = m1
+        v = re.Replace(v, m0 & aF(0) & m3 & "." & aF(1) & aF(2))
+      End If
+    End If
+  Next
+  If iba > 0 Then iba = iba - 1: GoTo l
+Return
+End Function
+
+Sub VNiTelexMultiDecode(ParamArray text())
+  Dim i%, s$, p, v$
+  v = vbBack & vbBack & "\" & vbBack
+  p = text: s = join(p, v)
+  p = Split(VNiTelexDecode(s), v)
+  For i = 0 To UBound(text)
+    text(i) = p(i)
+  Next
+End Sub
+Function VNiTelexDecode(ByVal text As String, Optional oregex___ As Object, Optional odi___ As Object) As String
+  'VNiTelex v1.22  29/01/2024
+  Dim l&: l = Len(text): If l = 0 Then Exit Function
+  Dim di2, x$, mm$, m, ms, m0$, m1$, m2$, m3$, m4, ba1, iba%, angg, re, re2 As Object, v$, z$, ms2, m_, i1&, i2&, i3&
+  Set re = CreateObject("VBScript.RegExp")
+  With re:  .Global = -1: .IgnoreCase = -1: .MultiLine = -1
+    ' Nêìu chuôÞi nãÌm trong cãòp {/ ... /} thiÌ không biò thay thêì
+    .pattern = "(^|[^\\]?)\{/([^\u0008]*?)/\}"
+  End With
+
+  Set odi___ = CreateObject("Scripting.Dictionary"): odi___.CompareMode = 1
+  ' Các Phuò âm ghép
+  '"(?:\b|[:_])(?:ngh|tr|ch|th|nh|ng|gi|qu|ph|kh|gh|r|t|s|d|h|l|x|c|v|b|n|m|[\u0111])"
+  'AI, AO, AU, ÂU, AY, ÂY, EO, ÊU, IA, IÊU, YÊU, IU, OI, ÔI, ÕI, OAI, OAO, OAY, OEO, ÝA, UI, ÝI, ÝU, UÕ, UAI, UÂY, UÔI, ÝÕI, ÝÕU, UYA, UYU
+  angg = Array("a", "aw", "aa", "e", "ee", "i", "o", "oo", "ow", "u", "uw", "y")
+ 
+  For m = 0 To 11: odi___.add angg(m), m: Next
+  ba1 = Array(Array(0, 259, 226, 0, 234, 0, 0, 244, 417, 0, 432, 0), _
+              Array(225, 7855, 7845, 233, 7871, 237, 243, 7889, 7899, 250, 7913, 253), _
+              Array(224, 7857, 7847, 232, 7873, 236, 242, 7891, 7901, 249, 7915, 7923), _
+              Array(7843, 7859, 7849, 7867, 7875, 7881, 7887, 7893, 7903, 7911, 7917, 7927), _
+              Array(227, 7861, 7851, 7869, 7877, 297, 245, 7895, 7905, 361, 7919, 7929), _
+              Array(7841, 7863, 7853, 7865, 7879, 7883, 7885, 7897, 7907, 7909, 7921, 7925))
+  For iba = 0 To 5:
+    angg = ba1(iba)
+    For m = 0 To 11:
+      If angg(m) > 0 Then ba1(iba)(m) = ChrW$(angg(m)) Else ba1(iba)(m) = ""
+    Next
+  Next
+  Set di2 = CreateObject("Scripting.Dictionary"): di2.CompareMode = 0
+
+
+  Set oregex___ = CreateObject("VBScript.RegExp")
+  With oregex___:  .Global = True: .IgnoreCase = True: .MultiLine = True
+    .pattern = "((qu|gi|uo|[aeiouy])(ch|ng|nh|t|c|n|m|p|a|i|o|u|y|)\.([aweo][sfrxj]|[aweo]|[sfrxj]))"
+  End With
+ 
+  Set ms2 = re.Execute(text)
+  If ms2.count Then
+    i1 = 1
+    For Each m_ In ms2
+      v = m_.SubMatches(0)
+      If v = Empty Then i2 = 1 Else i2 = 2
+      i3 = m_.firstIndex + i2
+      If i3 > i1 Then
+        v = Mid$(text, i1, i3 - i1)
+        GoSub r: z = z & v & m_.SubMatches(1)
+      Else
+        z = z & m_.SubMatches(1)
+      End If
+      i1 = m_.firstIndex + m_.Length + 1
+    Next
+    If i1 <= l Then v = Mid$(text, i1): GoSub r: z = z & v
+  Else
+    v = text: GoSub r: z = v
+  End If
+  VNiTelexDecode = z
+Exit Function
+r:
+  If di2.count Then di2.RemoveAll
+ 
+
+  v = VNiUnescape(v, re2)
+ 
+  With re:
+    .IgnoreCase = 0
+    .pattern = "D[Dd]": v = .Replace(v, ChrW$(272))
+    .pattern = "d[Dd]": v = .Replace(v, ChrW$(273))
+    .IgnoreCase = 1
+  End With
+
+  Set ms = oregex___.Execute(v)
+  If ms.count = 0 Then Return
+  iba = 2
+l:
+  For Each m In ms
+    x = m
+ 
+    If Not di2.Exists(x) Then
+   
+      m1 = m.SubMatches(1)
+      m2 = m.SubMatches(2)
+      m3 = m.SubMatches(3)
+      If StrComp(m1, "gi", 1) = 0 Then
+        If m2 Like "[aiouyAIOUY]" Then
+          m0 = m1: m1 = m2: m2 = ""
+        Else
+          m0 = Left$(m1, 1): m1 = Right$(m1, 1)
+        End If
+      ElseIf StrComp(m1, "qu", 1) = 0 Then
+        m0 = m1: m1 = m2: m2 = ""
+      ElseIf StrComp(m1, "uo", 1) = 0 Then
+        If m3 Like "[wW]*" Then
+          If m2 = Empty Then m0 = Left$(m1, 1) Else m0 = ChrW$(432 + (m1 Like "U*"))
+        Else
+          m0 = Left$(m1, 1)
+        End If
+        m1 = Right$(m1, 1)
+      Else
+          Debug.Print "x:"; x, m2  ' "(^|[^aueiyo])" &
+        m0 = ""
+      End If
+      If m3 Like "[aAwWeEoO]*" Then m4 = m1 & Left$(m3, 1) Else m4 = m1
+      If Len(m3) = iba Then
+        di2.add x, x
+        Select Case Right$(m3, 1)
+        Case "s", "S": angg = ba1(1)
+        Case "f", "F": angg = ba1(2)
+        Case "r", "R": angg = ba1(3)
+        Case "x", "X": angg = ba1(4)
+        Case "j", "J": angg = ba1(5)
+        Case Else: angg = ba1(0)
+        End Select
+        If UCase$(m1) <> m1 Then m2 = angg(odi___(m4)) & m2 Else m2 = UCase$(angg(odi___(m4))) & m2
+        With re:
+          If x Like "[aeiouyAEIOUY].*" Then
+            .pattern = "(^|[^aueiyo])" & x: v = .Replace(v, "$1" & m0 & m2)
+          Else
+            .pattern = x: v = .Replace(v, mm & m0 & m2)
+          End If
+        End With
+      End If
+    End If
+  Next
+  If iba > 0 Then iba = iba - 1: GoTo l
+Return
+End Function
+
+
+Function VNiUnescape(ByVal str$, Optional RegEx As Object)
+  'VNiUnescape v1.2 : 03/02/2024 21:25
+  Dim m, s, t, ms, d As Object
+  On Error Resume Next
+
+  If RegEx Is Nothing Then
+    Set RegEx = CreateObject("VBScript.RegExp")
+    With RegEx: .Global = True: .IgnoreCase = True: .MultiLine = False
+      .pattern = "\\u([0-9a-fA-F]{4})"
+    End With
+  End If
+  With RegEx
+    s = Array("\\\\", "\\""", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t")
+    t = Array(vbBack & "{-}" & vbBack, """", "/", vbBack, vbFormFeed, vbLf, vbCr, vbTab)
+    For m = 0 To 7
+      .pattern = s(m): str = .Replace(str, t(m))
+    Next
+    Set d = CreateObject("Scripting.Dictionary")
+    .pattern = "\\u([0-9a-fA-F]{4})"
+    Set ms = RegEx.Execute(str)
+    For Each m In ms
+      t = m.SubMatches(0):
+      If Not d.Exists(t) Then
+        d.add t, ""
+        .pattern = "\\u" & t
+        str = .Replace(str, ChrW$(val("&H" & t)))
+      End If
+    Next m
+    .pattern = "\u0008" & "\{-\}" & "\u0008"
+    str = .Replace(str, "\")
+  End With
+  VNiUnescape = str
+  Err.Clear
+End Function
+
+
+Function VNiEscape(ByVal str$, Optional RegEx As Object)
+  'VNiEscape v1.2 : 03/02/2024 21:25
+
+  If RegEx Is Nothing Then Set RegEx = CreateObject("VBScript.RegExp")
+ 
+  On Error Resume Next
+  Dim s, t$, i&, k&, a, h$
+  With RegEx
+    .Global = True: .IgnoreCase = False: .MultiLine = False
+    .pattern = "(.)(?=.*\1)"
+    s = .Replace(str, "")
+    .pattern = "\\"
+    str = .Replace(str, "\\")
+    For i = 1 To Len(s)
+      t = Mid$(s, i, 1): a = AscW(t) And 65535
+      Select Case a
+      Case 1 To 127:
+      Case Else:
+        h = Hex(a): h = "\u" & String(4 - Len(h), "0") & h
+        .pattern = h: str = .Replace(str, h)
+      End Select
+    Next
+    a = Array("""", "/", "\u0008", "\u000C", "\u000A", "\u000D", "\u0009")
+    s = Array("""""", "\/", "\b", "\f", "\n", "\r", "\t")
+    For i = 0 To 6
+      .pattern = a(i): str = .Replace(str, s(i))
+    Next
+  End With
+  VNiEscape = str
+  Err.Clear
+End Function
+
+
+Function Replace2(ByVal Expression$, ByVal Find$, ByVal Replace As String, Optional compare As Boolean) As String
+  'Replace2 v1.2 : 03/02/2024 21:25
+  On Error Resume Next
+  With CreateObject("VBScript.RegExp")
+    .Global = True: .IgnoreCase = compare: .MultiLine = False
+    .pattern = Find
+    Expression = .Replace(Expression, Replace)
+  End With
+  Replace2 = Expression
+  Err.Clear
+End Function
